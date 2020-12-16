@@ -190,7 +190,15 @@ class Briey(config: BrieyConfig) extends Component{
     val jtag       = slave(Jtag())
     val sdram      = master(SdramInterface(sdramLayout))
 
+    val apbConfig = Apb3Config(
+      addressWidth  = 16,
+      dataWidth     = 32,
+      selWidth      = 1,
+      useSlaveError = false
+    )
+
     //Peripherals IO
+    val apbMaster0    = master(Apb3(apbConfig))
     val gpioA         = master(TriStateArray(32 bits))
     val gpioB         = master(TriStateArray(32 bits))
     val uart          = master(Uart())
@@ -266,6 +274,21 @@ class Briey(config: BrieyConfig) extends Component{
       idWidth      = 4
     )
 
+    // val apbBridgeMaster = Axi4SharedToApb3Bridge(
+    //   addressWidth = 20,
+    //   dataWidth    = 32,
+    //   idWidth      = 4
+    // )
+    val apbConfig = Apb3Config(
+      addressWidth  = 16,
+      dataWidth     = 32,
+      selWidth      = 1,
+      useSlaveError = false
+    )
+
+    //Peripherals IO
+    val apbMaster0Ctrl    = Apb3(apbConfig)
+
     val gpioACtrl = Apb3Gpio(
       gpioWidth = 32,
       withReadSync = true
@@ -327,10 +350,12 @@ class Briey(config: BrieyConfig) extends Component{
       ram.io.axi       -> (0x80000000L,   onChipRamSize),
       sdramCtrl.io.axi -> (0x40000000L,   sdramLayout.capacity),
       apbBridge.io.axi -> (0xF0000000L,   1 MB)
+      // apbBridgeMaster.io.axi -> (0xF0001000L,   1 KB)
     )
 
     axiCrossbar.addConnections(
       core.iBus       -> List(ram.io.axi, sdramCtrl.io.axi),
+      // core.dBus       -> List(ram.io.axi, sdramCtrl.io.axi, apbBridge.io.axi, apbBridgeMaster.io.axi),
       core.dBus       -> List(ram.io.axi, sdramCtrl.io.axi, apbBridge.io.axi),
       vgaCtrl.io.axi  -> List(            sdramCtrl.io.axi)
     )
@@ -342,6 +367,13 @@ class Briey(config: BrieyConfig) extends Component{
       crossbar.writeRsp             << bridge.writeRsp
       crossbar.readRsp              << bridge.readRsp
     })
+
+    // axiCrossbar.addPipelining(apbBridgeMaster.io.axi)((crossbar,bridge) => {
+    //   crossbar.sharedCmd.halfPipe() >> bridge.sharedCmd
+    //   crossbar.writeData.halfPipe() >> bridge.writeData
+    //   crossbar.writeRsp             << bridge.writeRsp
+    //   crossbar.readRsp              << bridge.readRsp
+    // })
 
     axiCrossbar.addPipelining(sdramCtrl.io.axi)((crossbar,ctrl) => {
       crossbar.sharedCmd.halfPipe()  >>  ctrl.sharedCmd
@@ -379,7 +411,8 @@ class Briey(config: BrieyConfig) extends Component{
         gpioBCtrl.io.apb -> (0x01000, 4 kB),
         uartCtrl.io.apb  -> (0x10000, 4 kB),
         timerCtrl.io.apb -> (0x20000, 4 kB),
-        vgaCtrl.io.apb   -> (0x30000, 4 kB)
+        vgaCtrl.io.apb   -> (0x30000, 4 kB),
+        apbMaster0Ctrl   -> (0x40000, 4 kB)
       )
     )
   }
@@ -390,6 +423,8 @@ class Briey(config: BrieyConfig) extends Component{
   io.uart           <> axi.uartCtrl.io.uart
   io.sdram          <> axi.sdramCtrl.io.sdram
   io.vga            <> axi.vgaCtrl.io.vga
+  io.apbMaster0     <> axi.apbMaster0Ctrl
+
 }
 
 //DE1-SoC
