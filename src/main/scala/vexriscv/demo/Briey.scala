@@ -279,6 +279,8 @@ class Briey(config: BrieyConfig) extends Component{
 
     val uartCtrl = Apb3UartCtrl(uartCtrlConfig)
 
+    val externalInterrupt = False
+    externalInterrupt setWhen(uartCtrl.io.interrupt)
 
     val vgaCtrlConfig = Axi4VgaCtrlGenerics(
       axiAddressWidth = 32,
@@ -307,7 +309,7 @@ class Briey(config: BrieyConfig) extends Component{
         case plugin : DBusSimplePlugin => dBus = plugin.dBus.toAxi4Shared()
         case plugin : DBusCachedPlugin => dBus = plugin.dBus.toAxi4Shared(true)
         case plugin : CsrPlugin        => {
-          plugin.externalInterrupt := BufferCC(io.coreInterrupt)
+          plugin.externalInterrupt := externalInterrupt
           plugin.timerInterrupt := timerCtrl.io.interrupt
         }
         case plugin : DebugPlugin      => debugClockDomain{
